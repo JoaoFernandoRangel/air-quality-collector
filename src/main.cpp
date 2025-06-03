@@ -9,11 +9,11 @@
 
 // User functions
 void processData(AsyncResult &aResult);
-
+String getTimestamp(unsigned long &t);
+void initWiFi();
 // Authentication
 UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS);
 
-// Firebase components
 FirebaseApp app;
 WiFiClientSecure ssl_client;
 using AsyncClient = AsyncClientClass;
@@ -49,40 +49,6 @@ float pressure;
 // Create JSON objects for storing data
 object_t jsonData, obj1, obj2, obj3, obj4;
 JsonWriter writer;
-
-
-
-// Initialize WiFi
-void initWiFi() {
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to WiFi ..");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(1000);
-  }
-}
-
-// Function that gets current epoch time
-
-// Função que retorna o timestamp como String no formato "YYYY-MM-DD HH:MM:SS"
-String getTimestamp(unsigned long &t) {
-  struct tm timeinfo;
-  time_t now;
-  
-  if (!getLocalTime(&timeinfo)) {
-    t = 0;
-    return "0000-00-00 00:00:00";
-  }
-
-  
-  time(&now);
-  t = static_cast<unsigned long>(now);
-  
-  char timestamp[20];
-  strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
-  
-  return String(timestamp);
-}
 
 void setup(){
   Serial.begin(115200);
@@ -156,4 +122,37 @@ void processData(AsyncResult &aResult){
 
   if (aResult.available())
     Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
+}
+
+
+
+
+// Initialize WiFi
+ 
+void initWiFi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi ..");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print('.');
+    delay(1000);
+  }
+}
+// Função que retorna o timestamp como String no formato "YYYY-MM-DD HH:MM:SS"
+String getTimestamp(unsigned long &t) {
+  struct tm timeinfo;
+  time_t now;
+  
+  if (!getLocalTime(&timeinfo)) {
+    t = 0;
+    return "0000-00-00 00:00:00";
+  }
+
+  
+  time(&now);
+  t = static_cast<unsigned long>(now);
+  
+  char timestamp[20];
+  strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  
+  return String(timestamp);
 }
