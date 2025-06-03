@@ -1,11 +1,11 @@
 
+#include "conf.h"
+#include "time.h"
 #include <Arduino.h>
+#include <FirebaseClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <FirebaseClient.h>
 #include <Wire.h>
-#include "time.h"
-#include "conf.h"
 
 // User functions
 void processData(AsyncResult &aResult);
@@ -40,7 +40,7 @@ String parentPath;
 
 String timestamp;
 
-const char* ntpServer = "pool.ntp.org";
+const char *ntpServer = "pool.ntp.org";
 
 float temperature;
 float humidity;
@@ -49,8 +49,18 @@ float pressure;
 // Create JSON objects for storing data
 object_t jsonData, obj1, obj2, obj3, obj4;
 JsonWriter writer;
+void task0(void *pvParameters);
+void task1(void *pvParameters);
+QueueHandle_t dataQueue;
 
-void setup(){
+struct SensorData {
+  float temperature;
+  float humidity;
+  float pressure;
+  unsigned long timestamp;
+};
+
+void setup() {
   Serial.begin(115200);
 
   initWiFi();
@@ -65,70 +75,105 @@ void setup(){
   initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask");
   app.getApp<RealtimeDatabase>(Database);
   Database.url(DATABASE_URL);
+  // Create tasks for each core
+  xTaskCreatePinnedToCore(task0, "Task0", 4096, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(task1, "Task1", 4096, nullptr, 1, nullptr, 1);
 }
 
-void loop(){
-  // Maintain authentication and async tasks
-  app.loop();
+SensorData data;
 
-  // Check if authentication is ready
-  if (app.ready()){
+void task0(void *pvParameters) {
+  unsigned long now = millis();
 
-    // Periodic data sending every 10 seconds
-    unsigned long currentTime = millis();
-    if (currentTime - lastSendTime >= sendInterval){
-      // Update the last send time
-      lastSendTime = currentTime;
+  while (true) {
+    if (millis() - now > 5000) {
+      now = millis();
 
-      uid = app.getUid().c_str();
+      for (int i = 0; i < 4; i++) {
+        // Gera dados normalizados (0.0 a 1.0)
+        float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
 
-      // Update database path
-      databasePath = "/temp_atmospheric_data/";
-      unsigned long tag;
-      //Get current timestamp
-      timestamp = getTimestamp(tag);
-
-      parentPath= databasePath + "/" + String(tag);
-
-      // Get sensor readings
-      temperature = millis() / 1000;
-      humidity = millis() / 10000;
-      pressure = millis() / 15000;
-
-      // Create a JSON object with the data
-      writer.create(obj1, tempPath, temperature);
-      writer.create(obj2, humPath, humidity);
-      writer.create(obj3, presPath, pressure);
-      writer.create(obj4, timePath, timestamp);
-      writer.join(jsonData, 4, obj1, obj2, obj3, obj4);
-
-      Database.set<object_t>(aClient, parentPath, jsonData, processData, "RTDB_Send_Data");
+        if (i == 0)
+          data.temperature = 20.0 + r * 10.0; // 20.0 a 30.0
+          if (i == 1)
+          data.humidity = 40.0 + r * 20.0; // 40.0 a 60.0
+          if (i == 2)
+          data.pressure = 950.0 + r * 100.0; // 950 a 1050
+        }
+        
+        getTimestamp(data.timestamp); // Atualiza timestamp
+        
+        // Envia struct para a fila
+        xQueueSend(dataQueue, &data, portMAX_DELAY);
     }
+
+    vTaskDelay(pdMS_TO_TICKS(100)); // Evita busy-wait
   }
 }
 
-void processData(AsyncResult &aResult){
+void task1(void *pvParameters) {
+  // Initialize Firebase app on core 1
+  while (true) {
+    app.loop();
+
+    // Check if authentication is ready
+    if (app.ready()) {
+      if (xQueueReceive(dataQueue, &data, portMAX_DELAY)) {
+        lastSendTime = millis();
+
+        String parentPath = "/temp_atmospheric_data/" + String(data.timestamp);
+        String tempPath = "temperature";
+        String humPath = "humidity";
+        String presPath = "pressure";
+        String timePath = "timestamp";
+
+        obj1.set(tempPath, data.temperature);
+        obj2.set(humPath, data.humidity);
+        obj3.set(presPath, data.pressure);
+        obj4.set(timePath, data.timestamp);
+        jsonData.set(tempPath, data.temperature);
+        jsonData.set(humPath, data.humidity);
+        jsonData.set(presPath, data.pressure);
+        jsonData.set(timePath, data.timestamp);
+
+        Database.set<FirebaseJson>(aClient, parentPath, jsonData, processData,
+                                   "RTDB_Send_Data");
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(500)); // Verifica com frequência razoável
+  }
+}
+
+
+void loop() {
+  // Maintain authentication and async tasks
+}
+
+void processData(AsyncResult &aResult) {
   if (!aResult.isResult())
     return;
 
   if (aResult.isEvent())
-    Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.eventLog().message().c_str(), aResult.eventLog().code());
+    Firebase.printf("Event task: %s, msg: %s, code: %d\n",
+                    aResult.uid().c_str(), aResult.eventLog().message().c_str(),
+                    aResult.eventLog().code());
 
   if (aResult.isDebug())
-    Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
+    Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(),
+                    aResult.debug().c_str());
 
   if (aResult.isError())
-    Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(), aResult.error().code());
+    Firebase.printf("Error task: %s, msg: %s, code: %d\n",
+                    aResult.uid().c_str(), aResult.error().message().c_str(),
+                    aResult.error().code());
 
   if (aResult.available())
-    Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
+    Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(),
+                    aResult.c_str());
 }
 
-
-
-
 // Initialize WiFi
- 
+
 void initWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to WiFi ..");
@@ -141,18 +186,17 @@ void initWiFi() {
 String getTimestamp(unsigned long &t) {
   struct tm timeinfo;
   time_t now;
-  
+
   if (!getLocalTime(&timeinfo)) {
     t = 0;
     return "0000-00-00 00:00:00";
   }
 
-  
   time(&now);
   t = static_cast<unsigned long>(now);
-  
+
   char timestamp[20];
   strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
-  
+
   return String(timestamp);
 }

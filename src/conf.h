@@ -6,7 +6,7 @@
 #define WIFI_SSID "VIVOFIBRA-0390"
 #define WIFI_PASSWORD "coisafacil"
 
-//Adicionar essas duas linhas no Arduino.h
+// Adicionar essas duas linhas no Arduino.h
 // Include the configuration header file
 // #define ENABLE_DATABASE
 // #define ENABLE_USER_AUTH
