@@ -77,7 +77,8 @@ void setup() {
   Database.url(DATABASE_URL);
   // Create tasks for each core
   xTaskCreatePinnedToCore(task0, "Task0", 4096, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(task1, "Task1", 4096, nullptr, 1, nullptr, 1);
+  xTaskCreatePinnedToCore(task1, "Task1", 2 * 4096, nullptr, 1, nullptr, 1);
+  dataQueue = xQueueCreate(2, sizeof(SensorData)); // Create a queue for sensor data
 }
 
 SensorData data;
@@ -86,7 +87,7 @@ void task0(void *pvParameters) {
   unsigned long now = millis();
 
   while (true) {
-    if (millis() - now > 5000) {
+    if (millis() - now > 1000) {
       now = millis();
 
       for (int i = 0; i < 4; i++) {
@@ -95,19 +96,19 @@ void task0(void *pvParameters) {
 
         if (i == 0)
           data.temperature = 20.0 + r * 10.0; // 20.0 a 30.0
-          if (i == 1)
+        if (i == 1)
           data.humidity = 40.0 + r * 20.0; // 40.0 a 60.0
-          if (i == 2)
+        if (i == 2)
           data.pressure = 950.0 + r * 100.0; // 950 a 1050
-        }
-        
-        getTimestamp(data.timestamp); // Atualiza timestamp
-        
-        // Envia struct para a fila
-        xQueueSend(dataQueue, &data, portMAX_DELAY);
+      }
+
+      getTimestamp(data.timestamp); // Atualiza timestamp
+
+      // Envia struct para a fila
+      xQueueSend(dataQueue, &data, portMAX_DELAY);
     }
 
-    vTaskDelay(pdMS_TO_TICKS(100)); // Evita busy-wait
+    vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
   }
 }
 
@@ -115,7 +116,6 @@ void task1(void *pvParameters) {
   // Initialize Firebase app on core 1
   while (true) {
     app.loop();
-
     // Check if authentication is ready
     if (app.ready()) {
       if (xQueueReceive(dataQueue, &data, portMAX_DELAY)) {
@@ -127,23 +127,20 @@ void task1(void *pvParameters) {
         String presPath = "pressure";
         String timePath = "timestamp";
 
-        obj1.set(tempPath, data.temperature);
-        obj2.set(humPath, data.humidity);
-        obj3.set(presPath, data.pressure);
-        obj4.set(timePath, data.timestamp);
-        jsonData.set(tempPath, data.temperature);
-        jsonData.set(humPath, data.humidity);
-        jsonData.set(presPath, data.pressure);
-        jsonData.set(timePath, data.timestamp);
+        // Create a JSON object with the data
+        writer.create(obj1, tempPath, data.temperature);
+        writer.create(obj2, humPath, data.humidity);
+        writer.create(obj3, presPath, data.pressure);
+        writer.create(obj4, timePath, data.timestamp);
+        writer.join(jsonData, 4, obj1, obj2, obj3, obj4);
 
-        Database.set<FirebaseJson>(aClient, parentPath, jsonData, processData,
-                                   "RTDB_Send_Data");
+        Database.set<object_t>(aClient, parentPath, jsonData, processData,
+                               "RTDB_Send_Data");
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(500)); // Verifica com frequência razoável
+    vTaskDelay(pdMS_TO_TICKS(50)); // Verifica com frequência razoável
   }
 }
-
 
 void loop() {
   // Maintain authentication and async tasks
