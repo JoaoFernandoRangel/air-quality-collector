@@ -49,8 +49,9 @@ float pressure;
 // Create JSON objects for storing data
 object_t jsonData, obj1, obj2, obj3, obj4;
 JsonWriter writer;
-void task0(void *pvParameters);
-void task1(void *pvParameters);
+void rng_test_task(void *pvParameters);
+void readerTask(void *pvParameters);
+void senderTask(void *pvParameters);
 QueueHandle_t dataQueue;
 
 struct SensorData {
@@ -76,14 +77,26 @@ void setup() {
   app.getApp<RealtimeDatabase>(Database);
   Database.url(DATABASE_URL);
   // Create tasks for each core
-  xTaskCreatePinnedToCore(task0, "Task0", 4096, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(task1, "Task1", 2 * 4096, nullptr, 1, nullptr, 1);
-  dataQueue = xQueueCreate(2, sizeof(SensorData)); // Create a queue for sensor data
+  // xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
+                          1);
+  dataQueue =
+      xQueueCreate(2, sizeof(SensorData)); // Create a queue for sensor data
 }
 
 SensorData data;
 
-void task0(void *pvParameters) {
+void readerTask(void *pvParameters) {
+
+  while (true) {
+
+    // xQueueSend(dataQueue, &data, portMAX_DELAY);
+    vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
+  }
+}
+
+void rng_test_task(void *pvParameters) {
   unsigned long now = millis();
 
   while (true) {
@@ -112,7 +125,7 @@ void task0(void *pvParameters) {
   }
 }
 
-void task1(void *pvParameters) {
+void senderTask(void *pvParameters) {
   // Initialize Firebase app on core 1
   while (true) {
     app.loop();
