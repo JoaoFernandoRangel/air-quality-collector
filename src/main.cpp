@@ -81,7 +81,6 @@ void rng_test_task(void *pvParameters) {
       }
 
       getTimestamp(data.timestamp); // Atualiza timestamp
-
       // Envia struct para a fila
       xQueueSend(dataQueue, &data, portMAX_DELAY);
     }
@@ -106,7 +105,7 @@ void senderTask(void *pvParameters) {
     app.loop();
     if (app.ready()) {
       if (xQueueReceive(dataQueue, &data, portMAX_DELAY)) {
-        String parentPath = "/atmospheric_data/" + String(data.timestamp);
+        String parentPath = "/esp_atmospheric_data/" + String(data.timestamp);
         String tempKey = "temperature";
         String humKey = "humidity";
         String presKey = "pressure";
