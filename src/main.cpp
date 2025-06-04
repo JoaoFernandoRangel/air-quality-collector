@@ -20,39 +20,15 @@ using AsyncClient = AsyncClientClass;
 AsyncClient aClient(ssl_client);
 RealtimeDatabase Database;
 
-// Timer variables for sending data every 10 seconds
-unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 10000; // 10 seconds in milliseconds
-
-// Variable to save USER UID
-String uid;
-
-// Database main path (to be updated in setup with the user UID)
-String databasePath;
-// Database child nodes
-String tempPath = "/temperature";
-String humPath = "/humidity";
-String presPath = "/pressure";
-String timePath = "/timestamp";
-
-// Parent Node (to be updated in every loop)
-String parentPath;
-
-String timestamp;
-
-const char *ntpServer = "pool.ntp.org";
-
-float temperature;
-float humidity;
-float pressure;
 
 // Create JSON objects for storing data
-object_t jsonData, obj1, obj2, obj3, obj4;
+object_t jsonData, obj[4];
 JsonWriter writer;
+QueueHandle_t dataQueue;
+
 void rng_test_task(void *pvParameters);
 void readerTask(void *pvParameters);
 void senderTask(void *pvParameters);
-QueueHandle_t dataQueue;
 
 struct SensorData {
   float temperature;
@@ -65,20 +41,10 @@ void setup() {
   Serial.begin(115200);
 
   initWiFi();
-  configTime(-10800, 0, ntpServer);
-
-  // Configure SSL client
-  ssl_client.setInsecure();
-  ssl_client.setTimeout(30);
-  ssl_client.setHandshakeTimeout(5);
-
-  // Initialize Firebase
-  initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask");
-  app.getApp<RealtimeDatabase>(Database);
-  Database.url(DATABASE_URL);
+  configTime(-10800, 0, "pool.ntp.org");
   // Create tasks for each core
-  // xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
+  // xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
   xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
                           1);
   dataQueue =
@@ -98,7 +64,6 @@ void readerTask(void *pvParameters) {
 
 void rng_test_task(void *pvParameters) {
   unsigned long now = millis();
-
   while (true) {
     if (millis() - now > 1000) {
       now = millis();
@@ -116,7 +81,6 @@ void rng_test_task(void *pvParameters) {
       }
 
       getTimestamp(data.timestamp); // Atualiza timestamp
-
       // Envia struct para a fila
       xQueueSend(dataQueue, &data, portMAX_DELAY);
     }
@@ -127,25 +91,32 @@ void rng_test_task(void *pvParameters) {
 
 void senderTask(void *pvParameters) {
   // Initialize Firebase app on core 1
+    // Configure SSL client
+  ssl_client.setInsecure();
+  ssl_client.setTimeout(30);
+  ssl_client.setHandshakeTimeout(5);
+
+  // Initialize Firebase
+  initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask");
+  app.getApp<RealtimeDatabase>(Database);
+  Database.url(DATABASE_URL);
   while (true) {
-    app.loop();
     // Check if authentication is ready
+    app.loop();
     if (app.ready()) {
       if (xQueueReceive(dataQueue, &data, portMAX_DELAY)) {
-        lastSendTime = millis();
-
-        String parentPath = "/temp_atmospheric_data/" + String(data.timestamp);
-        String tempPath = "temperature";
-        String humPath = "humidity";
-        String presPath = "pressure";
-        String timePath = "timestamp";
+        String parentPath = "/esp_atmospheric_data/" + String(data.timestamp);
+        String tempKey = "temperature";
+        String humKey = "humidity";
+        String presKey = "pressure";
+        String timeKey = "timestamp";
 
         // Create a JSON object with the data
-        writer.create(obj1, tempPath, data.temperature);
-        writer.create(obj2, humPath, data.humidity);
-        writer.create(obj3, presPath, data.pressure);
-        writer.create(obj4, timePath, data.timestamp);
-        writer.join(jsonData, 4, obj1, obj2, obj3, obj4);
+        writer.create(obj[0], tempKey, data.temperature);
+        writer.create(obj[1], humKey, data.humidity);
+        writer.create(obj[2], presKey, data.pressure);
+        writer.create(obj[3], timeKey, data.timestamp);
+        writer.join(jsonData, 4, obj[0], obj[1], obj[2], obj[3]);
 
         Database.set<object_t>(aClient, parentPath, jsonData, processData,
                                "RTDB_Send_Data");
