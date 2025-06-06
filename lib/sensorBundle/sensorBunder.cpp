@@ -1,16 +1,24 @@
 #include "sensorBundle.h"
 
-sensorBundle::sensorBundle() {
-    _dht11 = new DHT(DHT_PIN, DHT11);
+sensorBundle::sensorBundle(bool _DHT, bool MQ7, bool MQ135, bool RTC) {
+    _dht11_enabled = _DHT;
+    _mq7_enabled = MQ7;
+    _mq135_enabled = MQ135;
+    _rtc_enabled = RTC;
+    if (_dht11_enabled) {
+        _dht11 = new DHT(DHT_PIN, DHT11);
+    }
 }
 
-void sensorBundle::initSensors(){
+void sensorBundle::initSensors() {
     _dht11->begin();
 }
 
-void sensorBundle::pollSensors(){
-    _dht11_temp = _dht11->readTemperature();
-    _dht11_hum = _dht11->readHumidity();
+void sensorBundle::pollSensors() {
+    if (_dht11_enabled) {
+        _dht11_temp = _dht11->readTemperature();
+        _dht11_hum = _dht11->readHumidity();
+    }
 }
 
 float sensorBundle::getMQ7Ppm() {

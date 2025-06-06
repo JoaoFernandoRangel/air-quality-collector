@@ -11,7 +11,7 @@
 #define DHT_PIN 33 // Pino do DHT11
 class sensorBundle {
    public:
-    sensorBundle();
+    sensorBundle(bool DH, bool MQ7, bool MQ135, bool RTC);
     void initSensors();
     void pollSensors();
     float getMQ7Ppm();
@@ -24,4 +24,5 @@ class sensorBundle {
     DHT *_dht11;
     float _mq7_ppm, _mq135_ppm, _dht11_temp, _dht11_hum;
     unsigned long _timestamp;
+    bool _dht11_enabled, _mq7_enabled, _mq135_enabled, _rtc_enabled;
 };
