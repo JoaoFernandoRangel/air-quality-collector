@@ -8,10 +8,12 @@
 //  DHT11: Temperatura, humidade
 //  RTC- : timestamp (unix)
 
+#define DHT_PIN 33 // Pino do DHT11
 class sensorBundle {
    public:
     sensorBundle();
-
+    void initSensors();
+    void pollSensors();
     float getMQ7Ppm();
     float getMQ135Ppm();
     float getdht11Temp();
@@ -19,7 +21,7 @@ class sensorBundle {
     unsigned long getRTCTimestamp();
 
    private:
-    DHT _dht11;
+    DHT *_dht11;
     float _mq7_ppm, _mq135_ppm, _dht11_temp, _dht11_hum;
     unsigned long _timestamp;
 };

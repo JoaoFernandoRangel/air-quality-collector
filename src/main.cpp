@@ -9,7 +9,7 @@
 #include "sensorBundle.h"
 
 registerClass regClass("/registros");
-sensorBundle sensor();
+sensorBundle sensor;
 
 
 
@@ -41,7 +41,7 @@ void setup() {
     // initWiFi();
     // configTime(-10800, 0, "pool.ntp.org");
     // Create tasks for each core
-    regClass.registerInit();
+    // regClass.registerInit();
     xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
     // xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
     // xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
@@ -59,16 +59,15 @@ void rng_test_task(void *pvParameters) {
     unsigned long now[2];
     now[0] = millis();
     now[1] = millis();
+    sensor.initSensors();
     while (true) {
         if (millis() - now[0] > READ_INTERVAL) {
-            String timestamp = millis() / 1000 + String("s");
-            
-            // regClass.saveNewFile(timestamp, timestamp);
-            Serial.println("Saved file: " + timestamp);
+            sensor.pollSensors();
+            Serial.printf("Valor de temperatura: %.2f °C\n", sensor.getdht11Temp());
+            Serial.printf("Valor de humidade: %.2f %%\n", sensor.getdht11Humidade());
             now[0] = millis();
         }
         if (millis() - now[1] > 1.5 * READ_INTERVAL) {
-            regClass.listFiles();
             now[1] = millis();
         }
         vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
