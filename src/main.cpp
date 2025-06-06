@@ -9,7 +9,7 @@
 #include "sensorBundle.h"
 
 registerClass regClass("/registros");
-sensorBundle sensor(true, false, false, false);
+sensorBundle sensor(false, true, false, false);
 
 // User functions
 void processData(AsyncResult &aResult);
@@ -61,8 +61,8 @@ void rng_test_task(void *pvParameters) {
     while (true) {
         if (millis() - now[0] > READ_INTERVAL) {
             sensor.pollSensors();
-            Serial.printf("Valor de temperatura: %.2f °C -- ", sensor.getdht11Temp());
-            Serial.printf("Valor de humidade: %.2f %%\n", sensor.getdht11Humidade());
+            Serial.printf("Valor em ppm: %.2f --- ", sensor.getMQ7Ppm());
+            Serial.printf("Leitura analógica: %d \n", analogRead(MQ7_PIN));
             now[0] = millis();
         }
         if (millis() - now[1] > 1.5 * READ_INTERVAL) {
