@@ -5,7 +5,13 @@
 #include <FirebaseClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <Wire.h>
+#include "registerClass.h"
+#include "sensorBundle.h"
+
+registerClass regClass("/registros");
+sensorBundle sensor();
+
+
 
 // User functions
 void processData(AsyncResult &aResult);
@@ -14,7 +20,7 @@ void initWiFi();
 // Authentication
 
 // UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS);
-// FirebaseApp app;
+// FirebaseApp app;le
 // WiFiClientSecure ssl_client;
 // using AsyncClient = AsyncClientClass;
 // AsyncClient aClient(ssl_client);
@@ -29,63 +35,44 @@ void rng_test_task(void *pvParameters);
 void readerTask(void *pvParameters);
 void senderTask(void *pvParameters);
 
-struct SensorData {
-  float temperature;
-  float humidity;
-  float pressure;
-  unsigned long timestamp;
-};
-
 void setup() {
-  Serial.begin(115200);
+    Serial.begin(115200);
 
-  initWiFi();
-  configTime(-10800, 0, "pool.ntp.org");
-  // Create tasks for each core
-  // xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
-  // xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
-  // 1);
-  dataQueue =
-      xQueueCreate(2, sizeof(SensorData)); // Create a queue for sensor data
+    // initWiFi();
+    // configTime(-10800, 0, "pool.ntp.org");
+    // Create tasks for each core
+    regClass.registerInit();
+    xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
+    // xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
+    // xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
+    // 1);
 }
 
-SensorData data;
-
 void readerTask(void *pvParameters) {
-
-  while (true) {
-
-    // xQueueSend(dataQueue, &data, portMAX_DELAY);
-    vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
-  }
+    while (true) {
+        // xQueueSend(dataQueue, &data, portMAX_DELAY);
+        vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
+    }
 }
 
 void rng_test_task(void *pvParameters) {
-  unsigned long now = millis();
-  while (true) {
-    if (millis() - now > 5000) {
-      now = millis();
-
-      for (int i = 0; i < 4; i++) {
-        // Gera dados normalizados (0.0 a 1.0)
-        float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-
-        if (i == 0)
-          data.temperature = 20.0 + r * 10.0; // 20.0 a 30.0
-        if (i == 1)
-          data.humidity = 40.0 + r * 20.0; // 40.0 a 60.0
-        if (i == 2)
-          data.pressure = 950.0 + r * 100.0; // 950 a 1050
-      }
-
-      getTimestamp(data.timestamp); // Atualiza timestamp
-      // Envia struct para a fila
-      xQueueSend(dataQueue, &data, portMAX_DELAY);
+    unsigned long now[2];
+    now[0] = millis();
+    now[1] = millis();
+    while (true) {
+        if (millis() - now[0] > READ_INTERVAL) {
+            String timestamp = millis() / 1000 + String("s");
+            
+            // regClass.saveNewFile(timestamp, timestamp);
+            Serial.println("Saved file: " + timestamp);
+            now[0] = millis();
+        }
+        if (millis() - now[1] > 1.5 * READ_INTERVAL) {
+            regClass.listFiles();
+            now[1] = millis();
+        }
+        vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
     }
-
-    vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
-  }
 }
 
 // void senderTask(void *pvParameters) {
@@ -96,19 +83,18 @@ void rng_test_task(void *pvParameters) {
 //   ssl_client.setHandshakeTimeout(5);
 
 //   // Initialize Firebase
-//   initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask");
-//   app.getApp<RealtimeDatabase>(Database);
+//   initializeApp(aClient, app, getAuth(user_auth), processData, "🔐
+//   authTask"); app.getApp<RealtimeDatabase>(Database);
 //   Database.url(DATABASE_URL);
 //   while (true) {
 //     // Check if authentication is ready
 //     app.loop();
 //     if (app.ready()) {
 //       if (xQueueReceive(dataQueue, &data, portMAX_DELAY)) {
-//         String parentPath = "/esp_atmospheric_data/" + String(data.timestamp);
-//         String tempKey = "temperature";
-//         String humKey = "humidity";
-//         String presKey = "pressure";
-//         String timeKey = "timestamp";
+//         String parentPath = "/esp_atmospheric_data/" +
+//         String(data.timestamp); String tempKey = "temperature"; String humKey
+//         = "humidity"; String presKey = "pressure"; String timeKey =
+//         "timestamp";
 
 //         // Create a JSON object with the data
 //         writer.create(obj[0], tempKey, data.temperature);
@@ -126,41 +112,33 @@ void rng_test_task(void *pvParameters) {
 // }
 
 void loop() {
-  // Maintain authentication and async tasks
-  vTaskSuspend(NULL);
+    // Maintain authentication and async tasks
+    vTaskSuspend(NULL);
 }
 
 void processData(AsyncResult &aResult) {
-  if (!aResult.isResult())
-    return;
+    if (!aResult.isResult()) return;
 
-  if (aResult.isEvent())
-    Firebase.printf("Event task: %s, msg: %s, code: %d\n",
-                    aResult.uid().c_str(), aResult.eventLog().message().c_str(),
-                    aResult.eventLog().code());
+    if (aResult.isEvent())
+        Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.eventLog().message().c_str(),
+                        aResult.eventLog().code());
 
-  if (aResult.isDebug())
-    Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(),
-                    aResult.debug().c_str());
+    if (aResult.isDebug()) Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
 
-  if (aResult.isError())
-    Firebase.printf("Error task: %s, msg: %s, code: %d\n",
-                    aResult.uid().c_str(), aResult.error().message().c_str(),
-                    aResult.error().code());
+    if (aResult.isError())
+        Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(),
+                        aResult.error().code());
 
-  if (aResult.available())
-    Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(),
-                    aResult.c_str());
+    if (aResult.available()) Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
 }
 
 // Initialize WiFi
 
 void initWiFi() {
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to WiFi ..");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    delay(1000);
-  }
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    Serial.print("Connecting to WiFi ..");
+    while (WiFi.status() != WL_CONNECTED) {
+        Serial.print('.');
+        delay(1000);
+    }
 }
-

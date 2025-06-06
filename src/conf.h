@@ -6,6 +6,9 @@
 #define WIFI_SSID "wifi-celular"
 #define WIFI_PASSWORD "itwin123"
 
+#define READ_INTERVAL 1000
+
+
 // Adicionar essas duas linhas no Arduino.h
 // Include the configuration header file
 // #define ENABLE_DATABASE
