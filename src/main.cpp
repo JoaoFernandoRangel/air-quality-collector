@@ -12,14 +12,13 @@ void processData(AsyncResult &aResult);
 String getTimestamp(unsigned long &t);
 void initWiFi();
 // Authentication
-UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS);
 
-FirebaseApp app;
-WiFiClientSecure ssl_client;
-using AsyncClient = AsyncClientClass;
-AsyncClient aClient(ssl_client);
-RealtimeDatabase Database;
-
+// UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS);
+// FirebaseApp app;
+// WiFiClientSecure ssl_client;
+// using AsyncClient = AsyncClientClass;
+// AsyncClient aClient(ssl_client);
+// RealtimeDatabase Database;
 
 // Create JSON objects for storing data
 object_t jsonData, obj[4];
@@ -43,10 +42,10 @@ void setup() {
   initWiFi();
   configTime(-10800, 0, "pool.ntp.org");
   // Create tasks for each core
-  xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
-  // xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
-  xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
-                          1);
+  // xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
+  xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
+  // xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
+  // 1);
   dataQueue =
       xQueueCreate(2, sizeof(SensorData)); // Create a queue for sensor data
 }
@@ -65,7 +64,7 @@ void readerTask(void *pvParameters) {
 void rng_test_task(void *pvParameters) {
   unsigned long now = millis();
   while (true) {
-    if (millis() - now > 1000) {
+    if (millis() - now > 5000) {
       now = millis();
 
       for (int i = 0; i < 4; i++) {
@@ -89,45 +88,46 @@ void rng_test_task(void *pvParameters) {
   }
 }
 
-void senderTask(void *pvParameters) {
-  // Initialize Firebase app on core 1
-    // Configure SSL client
-  ssl_client.setInsecure();
-  ssl_client.setTimeout(30);
-  ssl_client.setHandshakeTimeout(5);
+// void senderTask(void *pvParameters) {
+//   // Initialize Firebase app on core 1
+//   // Configure SSL client
+//   ssl_client.setInsecure();
+//   ssl_client.setTimeout(30);
+//   ssl_client.setHandshakeTimeout(5);
 
-  // Initialize Firebase
-  initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask");
-  app.getApp<RealtimeDatabase>(Database);
-  Database.url(DATABASE_URL);
-  while (true) {
-    // Check if authentication is ready
-    app.loop();
-    if (app.ready()) {
-      if (xQueueReceive(dataQueue, &data, portMAX_DELAY)) {
-        String parentPath = "/esp_atmospheric_data/" + String(data.timestamp);
-        String tempKey = "temperature";
-        String humKey = "humidity";
-        String presKey = "pressure";
-        String timeKey = "timestamp";
+//   // Initialize Firebase
+//   initializeApp(aClient, app, getAuth(user_auth), processData, "🔐 authTask");
+//   app.getApp<RealtimeDatabase>(Database);
+//   Database.url(DATABASE_URL);
+//   while (true) {
+//     // Check if authentication is ready
+//     app.loop();
+//     if (app.ready()) {
+//       if (xQueueReceive(dataQueue, &data, portMAX_DELAY)) {
+//         String parentPath = "/esp_atmospheric_data/" + String(data.timestamp);
+//         String tempKey = "temperature";
+//         String humKey = "humidity";
+//         String presKey = "pressure";
+//         String timeKey = "timestamp";
 
-        // Create a JSON object with the data
-        writer.create(obj[0], tempKey, data.temperature);
-        writer.create(obj[1], humKey, data.humidity);
-        writer.create(obj[2], presKey, data.pressure);
-        writer.create(obj[3], timeKey, data.timestamp);
-        writer.join(jsonData, 4, obj[0], obj[1], obj[2], obj[3]);
+//         // Create a JSON object with the data
+//         writer.create(obj[0], tempKey, data.temperature);
+//         writer.create(obj[1], humKey, data.humidity);
+//         writer.create(obj[2], presKey, data.pressure);
+//         writer.create(obj[3], timeKey, data.timestamp);
+//         writer.join(jsonData, 4, obj[0], obj[1], obj[2], obj[3]);
 
-        Database.set<object_t>(aClient, parentPath, jsonData, processData,
-                               "RTDB_Send_Data");
-      }
-    }
-    vTaskDelay(pdMS_TO_TICKS(50)); // Verifica com frequência razoável
-  }
-}
+//         Database.set<object_t>(aClient, parentPath, jsonData, processData,
+//                                "RTDB_Send_Data");
+//       }
+//     }
+//     vTaskDelay(pdMS_TO_TICKS(50)); // Verifica com frequência razoável
+//   }
+// }
 
 void loop() {
   // Maintain authentication and async tasks
+  vTaskSuspend(NULL);
 }
 
 void processData(AsyncResult &aResult) {
@@ -163,21 +163,4 @@ void initWiFi() {
     delay(1000);
   }
 }
-// Função que retorna o timestamp como String no formato "YYYY-MM-DD HH:MM:SS"
-String getTimestamp(unsigned long &t) {
-  struct tm timeinfo;
-  time_t now;
 
-  if (!getLocalTime(&timeinfo)) {
-    t = 0;
-    return "0000-00-00 00:00:00";
-  }
-
-  time(&now);
-  t = static_cast<unsigned long>(now);
-
-  char timestamp[20];
-  strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
-
-  return String(timestamp);
-}
