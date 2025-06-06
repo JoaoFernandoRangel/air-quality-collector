@@ -5,10 +5,13 @@
 #include <FirebaseClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <Wire.h>
 #include "registerClass.h"
+#include "sensorBundle.h"
 
 registerClass regClass("/registros");
+sensorBundle sensor();
+
+
 
 // User functions
 void processData(AsyncResult &aResult);
