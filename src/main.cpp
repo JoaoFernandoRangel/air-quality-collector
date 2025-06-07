@@ -11,7 +11,7 @@
 //TODO - Implementar classe de leitura dos logs da memória flash
 //TODO - Implementar classe de envio para Firebase
 //TODO - Implementar subclasse de formatação de JSON para firebase e memória flash
-
+//TODO - Validar leituras do MQ135
 registerClass regClass("/registros");
 sensorBundle sensor(dht11, MQ7, MQ135, RTC);
 
