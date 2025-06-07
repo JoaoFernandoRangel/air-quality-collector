@@ -12,10 +12,8 @@
 //TODO - Implementar classe de envio para Firebase
 //TODO - Implementar subclasse de formatação de JSON para firebase e memória flash
 
-
-
 registerClass regClass("/registros");
-sensorBundle sensor(false, true, false, false);
+sensorBundle sensor(dht11, MQ7, MQ135, RTC);
 
 // User functions
 void processData(AsyncResult &aResult);

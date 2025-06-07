@@ -8,6 +8,10 @@
 
 #define READ_INTERVAL 1000
 
+#define dht11 false 
+#define MQ7 false
+#define MQ135 true
+#define RTC false
 
 // Adicionar essas duas linhas no Arduino.h
 // Include the configuration header file
