@@ -7,6 +7,9 @@
 #include <WiFiClientSecure.h>
 #include "registerClass.h"
 #include "sensorBundle.h"
+using namespace std;
+#include "cJSON.h"
+#include "string.h"
 
 // TODO - Implementar classe de leitura dos logs da memória flash
 // TODO - Implementar classe de envio para Firebase
@@ -17,6 +20,7 @@ sensorBundle sensor(dht11, MQ7, MQ135, RTC);
 
 // User functions
 void processData(AsyncResult &aResult);
+String returnJsonToSave(float mq7, float mq135, float temp, float humid, uint32_t rtcUnixTime);
 String getTimestamp(unsigned long &t);
 void initWiFi();
 // Authentication
@@ -142,4 +146,17 @@ void initWiFi() {
         Serial.print('.');
         delay(1000);
     }
+}
+
+String returnJsonToSave(float mq7, float mq135, float temp, float humid, uint32_t rtcUnixTime) {
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "mq7_CO", mq7);
+    cJSON_AddNumberToObject(root, "mq135_CO2", mq135);
+    cJSON_AddNumberToObject(root, "temp_celsius", temp);
+    cJSON_AddNumberToObject(root, "humid", humid);
+    cJSON_AddNumberToObject(root, "rtcUnixTime", rtcUnixTime);
+    String ret;
+    ret = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return ret;
 }
