@@ -1,21 +1,19 @@
 
+#include <Arduino.h>
 #include "conf.h"
 #include "time.h"
-#include <Arduino.h>
 #include <FirebaseClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include "registerClass.h"
 #include "sensorBundle.h"
 
-//TODO - Implementar classe de leitura dos logs da memória flash
-//TODO - Implementar classe de envio para Firebase
-//TODO - Implementar subclasse de formatação de JSON para firebase e memória flash
-
-
-
+// TODO - Implementar classe de leitura dos logs da memória flash
+// TODO - Implementar classe de envio para Firebase
+// TODO - Implementar subclasse de formatação de JSON para firebase e memória flash
+// TODO - Validar leituras do MQ135
 registerClass regClass("/registros");
-sensorBundle sensor(false, true, false, false);
+sensorBundle sensor(dht11, MQ7, MQ135, RTC);
 
 // User functions
 void processData(AsyncResult &aResult);

@@ -1,15 +1,21 @@
 #include "sensorBundle.h"
 
-sensorBundle::sensorBundle(bool _DHT, bool MQ7, bool MQ135, bool RTC) {
-    _dht11_enabled = _DHT;
-    _mq7_enabled = MQ7;
-    _mq135_enabled = MQ135;
-    _rtc_enabled = RTC;
+sensorBundle::sensorBundle(bool DH, bool mq7, bool _MQ135, bool rtc) {
+    _dht11_enabled = DH;
+    _mq7_enabled = mq7;
+    _mq135_enabled = _MQ135;
+    _rtc_enabled = rtc;
     if (_dht11_enabled) {
         _dht11 = new DHT(DHT_PIN, DHT11);
     }
     if (_mq7_enabled) {
         _mq7 = new MQUnifiedsensor("ESP32", 3.3, 12, MQ7_PIN, "MQ-7"); // 3.3V, 12-bit ADC, MQ-7 sensor
+    }
+    if (_mq135_enabled) {
+        _mq135 = new mq135(MQ135_PIN);
+    }
+    if (_rtc_enabled) {
+        _rtc = new RTC_DS1307();
     }
 }
 
@@ -23,11 +29,18 @@ void sensorBundle::initSensors() {
         _mq7->setB(-1.518);
         _mq7->init();
         int _calcR0 = 0;
-        for(int i = 0; i < 10; i++) {
+        for (int i = 0; i < 10; i++) {
             _mq7->update();
             _calcR0 += _mq7->calibrate(27.5); // Calibrating with clean air
         }
         _mq7->setR0(_calcR0 / 10); // Set the average R0 value
+    }
+    if (_mq135_enabled) {
+        _mq135->init();
+        _mq135->setSensitivity(200); // Set sensitivity for MQ135
+    }
+    if (_rtc_enabled) {
+        _rtc->begin();
     }
 }
 
@@ -36,10 +49,26 @@ void sensorBundle::pollSensors() {
         _dht11_temp = _dht11->readTemperature();
         _dht11_hum = _dht11->readHumidity();
     }
-    if(_mq7_enabled){
+    if (_mq7_enabled) {
         _mq7->update();
-        _mq7_ppm = _mq7->readSensor();
+        _mq7_ppm = _mq7->readSensor(); //Le valor de CO
     }
+    if (_mq135_enabled) {
+        _mq135->update();
+        _mq135_ppm = _mq135->getAirQuality(); // Le valor de CO2
+    }
+    if (_rtc_enabled) {
+        this->setDateTime(_rtc->now()); //Busca no relógio o UTC
+        _timestampUnixTime = _timeNow.unixtime();
+    }
+}
+
+void sensorBundle::setDateTime(DateTime d) {
+    _timeNow = d;
+}
+
+DateTime sensorBundle::getDateTime() {
+    return _timeNow;
 }
 
 float sensorBundle::getMQ7Ppm() {
@@ -54,6 +83,6 @@ float sensorBundle::getdht11Temp() {
 float sensorBundle::getdht11Humidade() {
     return _dht11_hum;
 }
-unsigned long sensorBundle::getRTCTimestamp() {
-    return _timestamp;
+uint32_t sensorBundle::getRTCTimestamp() {
+    return _timestampUnixTime;
 }
