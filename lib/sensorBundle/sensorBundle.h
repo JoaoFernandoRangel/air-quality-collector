@@ -3,7 +3,7 @@
 #include "DHT.h"
 #include "MQUnifiedsensor.h"
 #include "mq135.h"
-#include "Wire.h" 
+#include "Wire.h"
 #include "RTClib.h"
 // Lista de sensores
 //  MQ-7: Monóxido de Carbono - ppm
@@ -13,11 +13,11 @@
 
 #define DHT_PIN 33   // Pino do DHT11
 #define MQ7_PIN 33   // Pino do DHT11
-#define MQ135_PIN 33 // Pino do DHT11
+#define MQ135_PIN 27 // Pino do DHT11
 
 class sensorBundle {
    public:
-    sensorBundle(bool DH, bool mq7, bool _MQ135, bool rtc);
+    sensorBundle(bool DH = false, bool mq7 = false, bool _MQ135 = false, bool rtc = false);
     void initSensors();
     void pollSensors();
     float getMQ7Ppm();
@@ -27,6 +27,7 @@ class sensorBundle {
     uint32_t getRTCTimestamp();
     void setDateTime(DateTime d);
     DateTime getDateTime();
+    void calibrateCO2Reading();
 
    private:
     DHT *_dht11;
