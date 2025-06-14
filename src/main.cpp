@@ -12,8 +12,9 @@
 // TODO - Implementar classe de envio para Firebase
 // TODO - Implementar subclasse de formatação de JSON para firebase e memória flash
 // TODO - Validar leituras do MQ135
+
 registerClass regClass("/registros");
-sensorBundle sensor(dht11, MQ7, MQ135, RTC);
+sensorBundle sensor(true, false, true, false); // dht11, mq7, mq145, rtc
 
 // User functions
 void processData(AsyncResult &aResult);
@@ -44,6 +45,8 @@ void setup() {
     // configTime(-10800, 0, "pool.ntp.org");
     // Create tasks for each core
     // regClass.registerInit();
+    sensor.initSensors();
+    sensor.calibrateCO2Reading();
     xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
     // xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
     // xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
@@ -61,12 +64,14 @@ void rng_test_task(void *pvParameters) {
     unsigned long now[2];
     now[0] = millis();
     now[1] = millis();
-    sensor.initSensors();
     while (true) {
         if (millis() - now[0] > READ_INTERVAL) {
             sensor.pollSensors();
-            Serial.printf("Valor em ppm: %.2f --- ", sensor.getMQ7Ppm());
-            Serial.printf("Leitura analógica: %d \n", analogRead(MQ7_PIN));
+            Serial.println("====");
+            Serial.printf("Valor de temperatura: %.2f\n", sensor.getdht11Temp());
+            Serial.printf("Valor de humidade: %.2f\n", sensor.getdht11Humidade());
+            Serial.printf("Leitura de CO2: %.2f\n", sensor.getMQ135Ppm());
+            // Serial.println("====");
             now[0] = millis();
         }
         if (millis() - now[1] > 1.5 * READ_INTERVAL) {

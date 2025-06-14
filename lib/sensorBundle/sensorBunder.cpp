@@ -19,6 +19,11 @@ sensorBundle::sensorBundle(bool DH, bool mq7, bool _MQ135, bool rtc) {
     }
 }
 
+void sensorBundle::calibrateCO2Reading(){
+    _mq135->calibrate();
+}
+
+
 void sensorBundle::initSensors() {
     if (_dht11_enabled) {
         _dht11->begin();
@@ -37,7 +42,6 @@ void sensorBundle::initSensors() {
     }
     if (_mq135_enabled) {
         _mq135->init();
-        _mq135->setSensitivity(200); // Set sensitivity for MQ135
     }
     if (_rtc_enabled) {
         _rtc->begin();

@@ -12,15 +12,40 @@ void mq135::init() {
     pinMode(_pin, INPUT);
 }
 
-void mq135::setSensitivity(int sensitivity) {
+void mq135::setSensitivity(float sensitivity) {
     _sensitivity = sensitivity;
 }
 
-void mq135::update() {
-    _sensorValue = analogRead(_pin);
-    _airQuality = _sensorValue * _sensitivity / _resolution; // Calcular a qualidade do ar
+void mq135::setRefValue(float refValue) {
+    _refValue = refValue;
 }
 
-int mq135::getAirQuality() {
+void mq135::update() {
+    // int buffer = 0;
+    // for (int i = 0; i < 10; i++) {
+    //     buffer += analogRead(_pin);
+    //     vTaskDelay(pdMS_TO_TICKS(50));
+    // }
+    // _sensorValue = buffer / 10;
+    _sensorValue = analogRead(_pin);
+    Serial.printf("\n---\nValor pós média: %d\n", _sensorValue);
+    _airQuality = (float)_sensorValue * _sensitivity / _resolution; // Calcular a qualidade do ar
+    Serial.printf("Valor calculado: %.2f\n---\n", _airQuality);
+}
+
+float mq135::getAirQuality() {
     return _airQuality;
+}
+
+void mq135::calibrate() {
+    int buffer;
+    Serial.printf("O sensor passará por um processo de calibração... Favor aguardar\n");
+    for (int i = 0; i < 10; i++) {
+        buffer += analogRead(_pin);
+        Serial.print(".");
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+    float valorSoma = (float)buffer / 10;
+    _sensitivity = _refValue * (_resolution - 1) / valorSoma;
+    Serial.printf("\n Valor de calibração : %.2f\n");
 }

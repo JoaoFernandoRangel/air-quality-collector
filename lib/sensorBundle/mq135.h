@@ -6,15 +6,18 @@ class mq135 {
     mq135(uint8_t pin);
     void init();
     void setPin(uint8_t pin);
-    void setSensitivity(int sensitivity);
+    void setSensitivity(float sensitivity);
+    void setRefValue(float sensitivity);
     void update();
-    int getAirQuality();
+    float getAirQuality();
+    void calibrate();
 
    private:
     uint8_t _pin;
     int _movingAvarageArray[10];
     int _sensorValue;
-    int _sensitivity = 200; // Varia com a calibração
-    int _airQuality;
+    float _sensitivity = 200.0; // Varia com a calibração
+    float _airQuality;
     int _resolution = 4096; // 12-bit ADC resolution
+    int _refValue = 440;
 };
