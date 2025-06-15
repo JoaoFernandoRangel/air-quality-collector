@@ -13,7 +13,7 @@
 
 #define DHT_PIN 33   // Pino do DHT11
 #define MQ7_PIN 33   // Pino do DHT11
-#define MQ135_PIN 27 // Pino do DHT11
+#define MQ135_PIN 35 // Pino do DHT11
 
 class sensorBundle {
    public:

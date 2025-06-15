@@ -17,13 +17,13 @@ using namespace std;
 // TODO - Validar leituras do MQ135
 
 registerClass regClass("/registros");
-sensorBundle sensor(true, false, true, false); // dht11, mq7, mq145, rtc
+sensorBundle sensor(1, false, true, false); // dht11, mq7, mq145, rtc
 
 // User functions
 void processData(AsyncResult &aResult);
-String returnJsonToSave(float mq7, float mq135, float temp, float humid, uint32_t rtcUnixTime);
-String getTimestamp(unsigned long &t);
+String returnJsonToSave(float mq7, float mq135, float temp, float humid, time_t rtcUnixTime);
 void initWiFi();
+void salvarTempoBase(time_t now);
 // Authentication
 
 // UserAuth user_auth(Web_API_KEY, USER_EMAIL, USER_PASS);
@@ -42,19 +42,41 @@ void rng_test_task(void *pvParameters);
 void readerTask(void *pvParameters);
 void senderTask(void *pvParameters);
 
+// Fuso horário do Brasil
+const int gmtOffset_sec = -3 * 3600;
+const int daylightOffset_sec = 0;
+
+// Variáveis persistentes no RTC (sobrevivem ao deep sleep)
+RTC_DATA_ATTR time_t unixBaseTime = 0;
+RTC_DATA_ATTR unsigned long millisBase = 0;
+
 void setup() {
     Serial.begin(115200);
 
-    // initWiFi();
-    // configTime(-10800, 0, "pool.ntp.org");
-    // Create tasks for each core
+    initWiFi();
+    // Só sincroniza se ainda não tiver um valor salvo
+    if (unixBaseTime == 0) {
+        Serial.println("Sincronizando com NTP...");
+        configTime(gmtOffset_sec, daylightOffset_sec, "pool.ntp.org");
+
+        struct tm timeinfo;
+        while (!getLocalTime(&timeinfo)) {
+            Serial.println("Aguardando NTP...");
+            delay(1000);
+        }
+
+        time_t now = time(NULL);
+        salvarTempoBase(now);
+    } else {
+        Serial.printf("Tempo já salvo (Unix): %ld\n", unixBaseTime);
+    }
+
     // regClass.registerInit();
     sensor.initSensors();
     sensor.calibrateCO2Reading();
     xTaskCreatePinnedToCore(rng_test_task, "Task0", 4096, nullptr, 1, nullptr, 0);
     // xTaskCreatePinnedToCore(readerTask, "Task0", 4096, nullptr, 1, nullptr, 0);
-    // xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr,
-    // 1);
+    // xTaskCreatePinnedToCore(senderTask, "Task1", 2 * 4096, nullptr, 1, nullptr, 1);
 }
 
 void readerTask(void *pvParameters) {
@@ -65,23 +87,25 @@ void readerTask(void *pvParameters) {
 }
 
 void rng_test_task(void *pvParameters) {
-    unsigned long now[2];
-    now[0] = millis();
-    now[1] = millis();
+    unsigned long timer[2];
+    timer[0] = millis();
+    timer[1] = millis();
     while (true) {
-        if (millis() - now[0] > READ_INTERVAL) {
+        if (millis() - timer[0] > READ_INTERVAL) {
             sensor.pollSensors();
-            Serial.println("====");
-            Serial.printf("Valor de temperatura: %.2f\n", sensor.getdht11Temp());
-            Serial.printf("Valor de humidade: %.2f\n", sensor.getdht11Humidade());
-            Serial.printf("Leitura de CO2: %.2f\n", sensor.getMQ135Ppm());
-            // Serial.println("====");
-            now[0] = millis();
+            time_t now = unixBaseTime + (millis() - millisBase) / 1000;
+            String str = returnJsonToSave(0.0, sensor.getMQ135Ppm(), sensor.getdht11Temp(), sensor.getdht11Humidade(), now);
+            Serial.print("Valor a ser salvo na memória: ");
+            Serial.println(str);
+            Serial.printf("Valor analógico lido: %d\n", analogRead(MQ135_PIN));
+            timer[0] = millis();
         }
-        if (millis() - now[1] > 1.5 * READ_INTERVAL) {
-            now[1] = millis();
+        if (millis() - timer[1] > minutos(5))
+        {
+            sensor.calibrateCO2Reading();
+            timer[1] = millis();
         }
-        vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
+        // vTaskDelay(pdMS_TO_TICKS(50)); // Evita busy-wait
     }
 }
 
@@ -153,15 +177,28 @@ void initWiFi() {
     }
 }
 
-String returnJsonToSave(float mq7, float mq135, float temp, float humid, uint32_t rtcUnixTime) {
+String returnJsonToSave(float mq7, float mq135, float temp, float humid, time_t rtcUnixTime) {
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "mq7_CO", mq7);
-    cJSON_AddNumberToObject(root, "mq135_CO2", mq135);
-    cJSON_AddNumberToObject(root, "temp_celsius", temp);
-    cJSON_AddNumberToObject(root, "humid", humid);
+    // Arredondamento para duas casas decimais
+    float mq7_r = roundf(mq7 * 100) / 100.0;
+    float mq135_r = roundf(mq135 * 100) / 100.0;
+    float temp_r = roundf(temp * 100) / 100.0;
+    float humid_r = roundf(humid * 100) / 100.0;
+
+    // Adiciona ao JSON
+    cJSON_AddNumberToObject(root, "mq7_CO", mq7_r);
+    cJSON_AddNumberToObject(root, "mq135_CO2", mq135_r);
+    cJSON_AddNumberToObject(root, "temp_celsius", temp_r);
+    cJSON_AddNumberToObject(root, "humid", humid_r);
     cJSON_AddNumberToObject(root, "rtcUnixTime", rtcUnixTime);
     String ret;
     ret = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     return ret;
+}
+
+void salvarTempoBase(time_t now) {
+    unixBaseTime = now;
+    millisBase = millis();
+    Serial.printf("Tempo base salvo: %ld (millis: %lu)\n", unixBaseTime, millisBase);
 }

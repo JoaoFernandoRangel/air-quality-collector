@@ -18,6 +18,6 @@ class mq135 {
     int _sensorValue;
     float _sensitivity = 200.0; // Varia com a calibração
     float _airQuality;
-    int _resolution = 4096; // 12-bit ADC resolution
-    int _refValue = 440;
+    float _resolution = 4096.0; // 12-bit ADC resolution
+    float _refValue = 440.0;
 };
